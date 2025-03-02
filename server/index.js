@@ -1,6 +1,16 @@
 const http = require('http')
-const express = require('exoress')
+const express = require('express')
 const { Server: SocketServer } = require('socket.io')
+
+const pty = require('node-pty')
+
+const ptyProcess = pty.spawn('bash', [], {
+    name: 'xterm-color',
+    cols: 80,
+    rows: 30,
+    cwd: process.env.HOME,
+    env: process.env
+});
 
 const app = express()
 const server = http.createServer(app);
@@ -10,4 +20,15 @@ const io = new SocketServer({
 
 io.attach(server); 
 
-server.listen(9000, () => console.log('docker running in port 9000'))
+ptyProcess.onData(data => {
+    io.emit('terminal:data', data)
+})
+
+io.on('connection', (socket) => {
+    console.log(`socket connected`, socket.id)
+    socket.on('terminal:write', (data) => {
+        ptyProcess.write(data)
+    })
+})
+
+server.listen(9000, () => console.log(`docker running in port 9000`))
